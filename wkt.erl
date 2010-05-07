@@ -22,7 +22,7 @@
 -module(wkt).
 -include_lib("eunit/include/eunit.hrl").
 
--export([scan/1]).
+-export([scan/1, parse/1]).
 
 scan(Wkt) ->
     % WKT always starts with a geometry type
@@ -168,9 +168,45 @@ char_type(Char) ->
     end.
 
 
+parse(Wkt) ->
+    {ok, Scanned} = scan(Wkt),
+    io:format("Scanned: ~p~n", [Scanned]),
+    {[Type|Values], _} = lists:foldl(fun(Token, {Result, Stack}=Acc) ->
+        case Token of
+        {text, _, Text} ->
+            {Result ++ [Text], Stack};
+        {number_literal, _, Number} ->
+            [H|T] = Stack,
+            {Result, [H ++ [Number]|T]};
+        {open_coords, _, _} ->
+            {Result, [[]|Stack]};
+        {close_coords_list, _, _} when length(Stack) > 0 ->
+            {Result ++ [lists:reverse(Stack)], []};
+        _ ->
+            Acc
+        end
+    end, {[], []}, Scanned),
+    {Type, Values}.
 
-%scan_test() ->
-    %Result = scan("point(10 10)"),
+
+
+%parse_test() ->
+%    Result1 = parse("point(10 10)"),
+%    Result2 = parse("LINESTRING(10 10, 20 20, 30 40)"),
+%    Result3 = parse("POLYGON ((10 11, 10 21, 20 21, 20 15, 10 11))"),
+%    Result4 = parse("POLYGON ((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0), (0.2 0.2, 0.2 0.8, 0.8 0.8, 0.8 0.2, 0.2 0.2))"),
+%    Result5 = parse("MULTIPOLYGON(((10 10, 10 20, 20 20, 20 15, 10 10)),((60 60, 70 70, 80 60, 60 60)))"),
+%    Result6 = parse("POLYGON ((0.0 0.0, 0.0 1.0), (0.2 0.2, 0.2 0.8), (0.5 0.5, 0.5 0.6))"),
+%    io:format("Result1: ~p~n", [Result1]),
+%    io:format("Result2: ~p~n", [Result2]),
+%    io:format("Result3: ~p~n", [Result3]),
+%    io:format("Result4: ~p~n", [Result4]),
+%    io:format("Result5: ~p~n", [Result5]),
+%    io:format("Result6: ~p~n", [Result6]).
+%    %?assertEqual(something, Result).
+
+scan_test() ->
+    Result = scan("point(10 10)"),
     %Result = scan("point(10.5 -0.11)"),
     %Result = scan("LINESTRING(10 10, 20 20, 30 40)"),
     %Result = scan("POLYGON ((10 11, 10 21, 20 21, 20 15, 10 11))"),
@@ -186,7 +222,7 @@ char_type(Char) ->
 %    Result = scan("GEOMETRYCOLLECTION(POINT (10 10), POINT(30 30), LINESTRING(15 15, 20 20))"),
     %Result = scan("G(10)"),
     %Result = scan("Gewrw(Pewr(10 10))"),
-%    io:format("Results: ~p~n", [Result]).
+    io:format("Results: ~p~n", [Result]).
     %?assertEqual(something, scan("point(10 10)")).
 
 %scan_ws_test() ->
