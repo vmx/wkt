@@ -22,172 +22,129 @@
 -module(wkt).
 -include_lib("eunit/include/eunit.hrl").
 
--export([scan/1, parse/1]).
+-export([parse/1]).
 
-scan(Wkt) ->
-    % WKT always starts with a geometry type
-    scan(Wkt, [], {1, 1}, type).
+%char_type(Char) ->
+%    case Char of 
+%        C when ((C >= $a) and (C =< $z)) or ((C >= $A) and (C =< $Z)) ->
+%            letter;
+%        C when ((C >= $0) and (C =< $9)) ->
+%            digit;
+%        C when (C == $.) ->
+%            point;
+%        C when (C == $-) ->
+%            minus;
+%        _ ->
+%            undefined
+%    end.
 
-%scan([], Scanned, _, _) ->
-%    {ok, lists:reverse(lists:map(fun
-%        ({identifier, Pos, String}) ->
-%            RevString = lists:reverse(String),
-%            Keywords = [ "if", "else", "endif", "not" ], %many others too
-%            Type = case lists:member(RevString, Keywords) of
-%            true ->
-%                list_to_atom(RevString ++ "_keyword");
-%            _ ->
-%                identifier
-%            end,
-%            {Type, Pos, RevString};
-%        ({Type, Pos, String}) ->
-%            {Type, Pos, lists:reverse(String)}
-%        end, Scanned))};
 
-scan([], Scanned, _, _) ->
-    {ok, lists:reverse(lists:map(fun({Type, Pos, String}) ->
-        {Type, Pos, lists:reverse(String)}
-    end, Scanned))};
+%parse(Wkt) ->
+%    {ok, Scanned} = scan(Wkt),
+%    io:format("Scanned: ~p~n", [Scanned]),
+%    {[Type|Values], _} = lists:foldl(fun(Token, {Result, Stack}=Acc) ->
+%        case Token of
+%        {text, _, Text} ->
+%            {Result ++ [Text], Stack};
+%        {number_literal, _, Number} ->
+%            [H|T] = Stack,
+%            {Result, [H ++ [Number]|T]};
+%        {open_coords, _, _} ->
+%            {Result, [[]|Stack]};
+%        {close_coords_list, _, _} when length(Stack) > 0 ->
+%            {Result ++ [lists:reverse(Stack)], []};
+%        _ ->
+%            Acc
+%        end
+%    end, {[], []}, Scanned),
+%    {Type, Values}.
 
-% coord_list are all coordinates within a (). The second element in the
-%     in_coord_list tuple is the number of parenthesis
-% coord are digits that describe one coordinate.
 
-% skip leading whitespaces
-scan(" " ++ T, Scanned, {Row, Column}, type) ->
-    scan(T, Scanned, {Row, Column+1}, type);
 
-% get started
-scan("(" ++ T, Scanned, {Row, Column}, type) ->
-    scan(T, [{open_coords_list, {Row, Column}, ["["]}|Scanned], {Row, Column+1}, {in_coord_list, 1});
-% opening further parenthesis
-scan("(" ++ T, Scanned, {Row, Column}, {in_coord_list, Parenthesis}) ->
-    scan(T, [{open_coords_list, {Row, Column}, ["["]}|Scanned], {Row, Column+1}, {in_coord_list, Parenthesis+1});
-
-% closing after a parenthesis
-scan(")" ++ T, Scanned, {Row, Column}, {in_coord_list, 1}) ->
-    scan(T, [{close_coords_list, {Row, Column}, ["]"]}|Scanned], {Row, Column+1}, done);
-scan(")" ++ T, Scanned, {Row, Column}, {in_coord_list, 2}) ->
-    scan(T, [{close_coords_list, {Row, Column}, ["]"]}|Scanned], {Row, Column+1}, {in_coord_list, 1});
-
-% closing after a coord
-scan(")" ++ T, Scanned, {Row, Column}, {in_number, 1}) ->
-    scan(T, [{close_coords_list, {Row, Column}, ["]"]}] ++
-            [{close_coords, {Row, Column}, ["]"]}] ++
-            Scanned,
-         {Row, Column+1}, done);
-scan(")" ++ T, Scanned, {Row, Column}, {in_number, Parenthesis}) ->
-    scan(T, [{close_coords_list, {Row, Column}, ["]"]}] ++
-            [{close_coords, {Row, Column}, ["]"]}] ++
-            Scanned,
-         {Row, Column+1}, {in_coord_list, Parenthesis-1});
-
-% seperator within a coord
-scan(" " ++ T, Scanned, {Row, Column}, {in_number, Parenthesis}) ->
-    scan(T, Scanned, {Row, Column+1}, {in_coord, Parenthesis});
-
-% seperator between coords
-scan("," ++ T, Scanned, {Row, Column}, {in_number, Parenthesis}) ->
-    scan(T, [{close_coords, {Row, Column}, ["]"]} | Scanned], {Row, Column+1}, {in_coord_list, Parenthesis});
-
-% seperator between coords_list
-scan("," ++ T, Scanned, {Row, Column}, {in_coord_list, Parenthesis}) ->
-    scan(T, Scanned, {Row, Column+1}, {in_coord_list, Parenthesis});
-
-% skip whitespace
-scan(" " ++ T, Scanned, {Row, Column}, {in_coord, Parenthesis}) ->
-    scan(T, Scanned, {Row, Column+1}, {in_coord, Parenthesis});
-scan(" " ++ T, Scanned, {Row, Column}, {in_coord_list, Parenthesis}) ->
-    scan(T, Scanned, {Row, Column+1}, {in_coord_list, Parenthesis});
-
-% scanning text (geometry types)
-scan([H|T], Scanned, {Row, Column}, type) ->
-    scan(T, append_text_char(Scanned, {Row, Column}, H), {Row, Column+1}, type);
-
-% numbers
-scan([H | T], Scanned, {Row, Column}, {in_coord, Parenthesis}) ->
-    CharType = char_type(H),
-    if (CharType == digit) or (CharType == minus) ->
-        scan(T,  [{number_literal, {Row, Column}, [H]} | Scanned], {Row, Column+1}, {in_number, Parenthesis});
-    true ->
-        {error, {illegal_character, {line, Row}, {column, Column}, {in_coord, Parenthesis}}}
-    end;
-scan([H | T], Scanned, {Row, Column}, {in_coord_list, Parenthesis}) ->
-    CharType = char_type(H),
-    if (CharType == digit) or (CharType == minus) ->
-        scan(T, [{number_literal, {Row, Column}, [H]}] ++
-                [{open_coords, {Row, Column}, ["["]}] ++
-                Scanned,
-             {Row, Column+1},{in_number, Parenthesis});
-    % In case of a geometrycollection
-    (CharType == letter) ->
-        scan(T, append_text_char(Scanned, {Row, Column}, H), {Row, Column+1}, {in_coord_list, Parenthesis});
-    true ->
-        {error, {illegal_character, {line, Row}, {column, Column}, {in_coord_list, Parenthesis}}}
-    end;
-scan([H | T], Scanned, {Row, Column}, {in_number, Parenthesis}) ->
-    CharType = char_type(H),
-    if (CharType == digit) or (CharType == point) ->
-        scan(T, append_char(Scanned, H), {Row, Column+1}, {in_number, Parenthesis});
-    true ->
-        {error, {illegal_character, {line, Row}, {column, Column}, {in_number, Parenthesis}}}
+parse([H|T]=Wkt) ->
+    io:format("parse: ~c (~p)~n", [H, T]),
+    case H of
+%    <<_:O/binary, "(", _/binary>> ->
+%    <<_:0/binary, "(", _/binary>> ->
+    $( ->
+        %{T, Acc} = parse_coord_list(T),
+        %Acc;
+        parse_coord_list(T);
+%    $) ->
+%        {end_coord_list};
+%    C when ((C >= $0) and (C =< $9)) ->
+%        %parse_number(Wkt);
+%        {number, C};
+    _ ->
+        parse(T)
     end.
 
 
+parse_coord_list(Wkt) ->
+    parse_coord_list(Wkt, [[]]).
+    %parse_coord_list(Wkt, []).
 
-append_char(Scanned, Char) ->
-    [String | Scanned1] = Scanned,
-    [setelement(3, String, [Char | element(3, String)]) | Scanned1].
-
-append_text_char(Scanned, {Row, Column}, Char) ->
-    case length(Scanned) of
-        0 ->
-            [{text, {Row, Column}, [Char]}];
-        _ ->
-            [Token | Scanned1] = Scanned,
-            case element(1, Token) of
-                text ->
-                    [{text, element(2, Token), [Char | element(3, Token)]} | Scanned1];
-                _ ->
-                    [{text, element(2, Token), [Char]} | Scanned]
-            end
+%coord_list([H|T], Acc) ->
+parse_coord_list([H|T], Acc) ->
+    io:format("parse_coord_list:~c~n", [H]),
+    case H of
+    $) ->
+        %Acc2 = lists:reverse(Acc),
+        %parse_coord_list(T, Acc2);
+        {T, lists:reverse(Acc)};
+    H when ((H >= $0) and (H =< $9)) ->
+        %coord_list(Wkt, Acc ++ [Num])
+        {Num, Wkt} = parse_number(T, [H]),
+        [AccH|AccT] = Acc,
+        parse_coord_list(Wkt, [AccH ++ [Num]|AccT]);
+        %parse_coord_list(Wkt, [Num|Acc]);
+    $\s ->
+        parse_coord_list(T, Acc);
+    $, ->
+        io:format("$,:~p~n", [Acc]),
+        % right a lsit of coords
+        parse_coord_list(T, [[]|Acc]);
+        %parse_coord_list(T, Acc);
+    $( ->
+        %[parse_coord_list(T, Acc)|[]];
+        io:format("$(1:~p~n", [Acc]),
+        %parse_coord_list(T, parse_coord_list(T, Acc));
+        {T2, Cl} = parse_coord_list(T),
+        io:format("$(2:~p~n", [Cl]),
+        [AccH|AccT] = Acc,
+        parse_coord_list(T2, [AccH ++ Cl|AccT]);
+        %parse_coord_list(T2, [Cl|Acc]);
+    _ ->
+        io:format("parse_coord_list: otherwise:~n~c~n", [H])
     end.
 
-char_type(Char) ->
-    case Char of 
-        C when ((C >= $a) and (C =< $z)) or ((C >= $A) and (C =< $Z)) ->
-            letter;
-        C when ((C >= $0) and (C =< $9)) ->
-            digit;
-        C when (C == $.) ->
-            point;
-        C when (C == $-) ->
-            minus;
-        _ ->
-            undefined
-    end.
+%parse_number([H|T]) ->
+%    case parse_number(T, [H]) of
+%    {number, Num} ->
+%        parse_number(T, [H] ++ [Num]);
+%    {no_number} ->
+%        T
+%    end.
 
 
-parse(Wkt) ->
-    {ok, Scanned} = scan(Wkt),
-    io:format("Scanned: ~p~n", [Scanned]),
-    {[Type|Values], _} = lists:foldl(fun(Token, {Result, Stack}=Acc) ->
-        case Token of
-        {text, _, Text} ->
-            {Result ++ [Text], Stack};
-        {number_literal, _, Number} ->
-            [H|T] = Stack,
-            {Result, [H ++ [Number]|T]};
-        {open_coords, _, _} ->
-            {Result, [[]|Stack]};
-        {close_coords_list, _, _} when length(Stack) > 0 ->
-            {Result ++ [lists:reverse(Stack)], []};
-        _ ->
-            Acc
-        end
-    end, {[], []}, Scanned),
-    {Type, Values}.
+%parse_number([], Acc) ->
+%    {number, Acc};
+parse_number([H|T], Acc) when (H >= $0) and (H =< $9) ->
+    %{number, H};
+    parse_number(T, Acc ++ [H]);
+parse_number(Wkt, Acc) ->
+%    {no_number}.
+    {Acc, Wkt}.
+    
 
+
+
+parse_test() ->
+    %Result = parse("(10 11 13, 21 23 46, 47 58 69)"),
+    %Result = parse("((10 11, 13 15), (21 23, 46 47), (47 58, 69 85))"),
+    %Result = parse("((10 11))"),
+    Result = parse("(((10 11)))"),
+    io:format("Results: ~p~n", [Result]).
 
 
 %parse_test() ->
@@ -205,8 +162,8 @@ parse(Wkt) ->
 %    io:format("Result6: ~p~n", [Result6]).
 %    %?assertEqual(something, Result).
 
-scan_test() ->
-    Result = scan("point(10 10)"),
+%scan_test() ->
+%    Result = scan("point(10 10)"),
     %Result = scan("point(10.5 -0.11)"),
     %Result = scan("LINESTRING(10 10, 20 20, 30 40)"),
     %Result = scan("POLYGON ((10 11, 10 21, 20 21, 20 15, 10 11))"),
@@ -222,7 +179,7 @@ scan_test() ->
 %    Result = scan("GEOMETRYCOLLECTION(POINT (10 10), POINT(30 30), LINESTRING(15 15, 20 20))"),
     %Result = scan("G(10)"),
     %Result = scan("Gewrw(Pewr(10 10))"),
-    io:format("Results: ~p~n", [Result]).
+%    io:format("Results: ~p~n", [Result]).
     %?assertEqual(something, scan("point(10 10)")).
 
 %scan_ws_test() ->
