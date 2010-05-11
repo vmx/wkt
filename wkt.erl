@@ -57,7 +57,9 @@ parse_list(Wkt, Acc) ->
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
         io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
-        parse_list_inner(Wkt2, [Parsed|Acc])
+        parse_list_inner(Wkt2, [Parsed|Acc]);
+    {space, Wkt2} ->
+        parse_list(Wkt2, Acc)
     end.
 
 parse_list_inner(Wkt, Acc) ->
@@ -69,7 +71,8 @@ parse_list_inner(Wkt, Acc) ->
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
 %    {comma, Wkt2} ->
-%        parse_list(Wkt2, Acc)
+%        {lists:reverse(Acc), Wkt2}
+%        %parse_list(Wkt2, Acc)
     end.
 
 
