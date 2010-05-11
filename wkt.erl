@@ -1,10 +1,4 @@
-% This Well Known Text (WKT) parser is based on the template compiling
-% tutorial at
-% http://www.evanmiller.org/write-a-template-compiler-for-erlang.html
-% and the code at
-% http://code.google.com/p/erlydtl/source/browse/trunk/src/erlydtl/erlydtl_scanner.erl
-% (2010-05-07)
-
+% The code is heavily based on MochiWeb's JSON decoder.
 
 % Examples from Wikipedia article
 % http://en.wikipedia.org/wiki/Simple_Features (2010-05-07)
@@ -24,118 +18,76 @@
 
 -export([parse/1]).
 
-%char_type(Char) ->
-%    case Char of 
-%        C when ((C >= $a) and (C =< $z)) or ((C >= $A) and (C =< $Z)) ->
-%            letter;
-%        C when ((C >= $0) and (C =< $9)) ->
-%            digit;
-%        C when (C == $.) ->
-%            point;
-%        C when (C == $-) ->
-%            minus;
-%        _ ->
-%            undefined
-%    end.
-
-
-%parse(Wkt) ->
-%    {ok, Scanned} = scan(Wkt),
-%    io:format("Scanned: ~p~n", [Scanned]),
-%    {[Type|Values], _} = lists:foldl(fun(Token, {Result, Stack}=Acc) ->
-%        case Token of
-%        {text, _, Text} ->
-%            {Result ++ [Text], Stack};
-%        {number_literal, _, Number} ->
-%            [H|T] = Stack,
-%            {Result, [H ++ [Number]|T]};
-%        {open_coords, _, _} ->
-%            {Result, [[]|Stack]};
-%        {close_coords_list, _, _} when length(Stack) > 0 ->
-%            {Result ++ [lists:reverse(Stack)], []};
-%        _ ->
-%            Acc
-%        end
-%    end, {[], []}, Scanned),
-%    {Type, Values}.
-
-
-
-parse([H|T]=Wkt) ->
-    io:format("parse: ~c (~p)~n", [H, T]),
-    case H of
-%    <<_:O/binary, "(", _/binary>> ->
-%    <<_:0/binary, "(", _/binary>> ->
-    $( ->
-        %{T, Acc} = parse_coord_list(T),
-        %Acc;
-        parse_coord_list(T);
-%    $) ->
-%        {end_coord_list};
-%    C when ((C >= $0) and (C =< $9)) ->
-%        %parse_number(Wkt);
-%        {number, C};
+parse(Wkt) ->
+    case parse_char(Wkt) of
+    {start_list, Wkt2} ->
+        parse_list(Wkt2);
+    {end_list, _Wkt2} ->
+        ok;
     _ ->
-        parse(T)
+        ok
     end.
 
-
-parse_coord_list(Wkt) ->
-    parse_coord_list(Wkt, [[]]).
-    %parse_coord_list(Wkt, []).
-
-%coord_list([H|T], Acc) ->
-parse_coord_list([H|T], Acc) ->
-    io:format("parse_coord_list:~c~n", [H]),
+parse_char([H|T]=Wkt) ->
+    io:format("parse: ~c|~p)~n", [H, T]),
     case H of
+    $( ->
+        {start_list, T};
     $) ->
-        %Acc2 = lists:reverse(Acc),
-        %parse_coord_list(T, Acc2);
-        {T, lists:reverse(Acc)};
-    H when ((H >= $0) and (H =< $9)) ->
-        %coord_list(Wkt, Acc ++ [Num])
-        {Num, Wkt} = parse_number(T, [H]),
-        [AccH|AccT] = Acc,
-        parse_coord_list(Wkt, [AccH ++ [Num]|AccT]);
-        %parse_coord_list(Wkt, [Num|Acc]);
-    $\s ->
-        parse_coord_list(T, Acc);
+        {end_list, T};
     $, ->
-        io:format("$,:~p~n", [Acc]),
-        % right a lsit of coords
-        parse_coord_list(T, [[]|Acc]);
-        %parse_coord_list(T, Acc);
-    $( ->
-        %[parse_coord_list(T, Acc)|[]];
-        io:format("$(1:~p~n", [Acc]),
-        %parse_coord_list(T, parse_coord_list(T, Acc));
-        {T2, Cl} = parse_coord_list(T),
-        io:format("$(2:~p~n", [Cl]),
-        [AccH|AccT] = Acc,
-        parse_coord_list(T2, [AccH ++ Cl|AccT]);
-        %parse_coord_list(T2, [Cl|Acc]);
+        {comma, T};
+    C when ((C >= $0) and (C =< $9)) ->
+        parse_number(Wkt);
     _ ->
-        io:format("parse_coord_list: otherwise:~n~c~n", [H])
+        parse_char(T)
     end.
 
-%parse_number([H|T]) ->
-%    case parse_number(T, [H]) of
-%    {number, Num} ->
-%        parse_number(T, [H] ++ [Num]);
-%    {no_number} ->
-%        T
-%    end.
+parse_list(Wkt) ->
+    parse_list(Wkt, []).
 
+parse_list(Wkt, Acc) ->
+    case parse_char(Wkt) of
+    {end_list, Wkt2} ->
+        {lists:reverse(Acc), Wkt2};
+    {start_list, Wkt2} ->
+        {List, Wkt3} = parse_list(Wkt2),
+        parse_list_inner(Wkt3, [List|Acc]);
+    {{parsed, Parsed}, Wkt2} ->
+        io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
+        parse_list_inner(Wkt2, [Parsed|Acc])
+    end.
+
+parse_list_inner(Wkt, Acc) ->
+    io:format("parse_list_inner:~p~n", [Acc]),
+    case parse_char(Wkt) of
+    {end_list, Wkt2} ->
+        %io:format("parse_list_inner: done: ~p~n", [Acc]),
+        {lists:reverse(Acc), Wkt2};
+    {comma, Wkt2} ->
+        parse_list(Wkt2, Acc)
+    end.
+
+
+parse_number([H|T]) ->
+    io:format("parse_number:~c~n", [H]),
+    case parse_number(T, [H]) of
+    {{number, Num}, Wkt} ->
+        %parse_number(T, [H] ++ [Num]);
+        {{parsed, erlang:list_to_integer(Num)}, Wkt};
+    {no_number} ->
+        T
+    end.
 
 %parse_number([], Acc) ->
 %    {number, Acc};
 parse_number([H|T], Acc) when (H >= $0) and (H =< $9) ->
     %{number, H};
     parse_number(T, Acc ++ [H]);
+% end of number/recursion
 parse_number(Wkt, Acc) ->
-%    {no_number}.
-    {Acc, Wkt}.
-    
+    {{number, Acc}, Wkt}.
+
 
 
 
