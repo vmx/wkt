@@ -39,6 +39,8 @@ parse_char([H|T]=Wkt) ->
         {comma, T};
     C when ((C >= $0) and (C =< $9)) ->
         parse_number(Wkt);
+    $\s ->
+        {space, T};
     _ ->
         parse_char(T)
     end.
@@ -64,8 +66,10 @@ parse_list_inner(Wkt, Acc) ->
     {end_list, Wkt2} ->
         %io:format("parse_list_inner: done: ~p~n", [Acc]),
         {lists:reverse(Acc), Wkt2};
-    {comma, Wkt2} ->
+    {space, Wkt2} ->
         parse_list(Wkt2, Acc)
+%    {comma, Wkt2} ->
+%        parse_list(Wkt2, Acc)
     end.
 
 
