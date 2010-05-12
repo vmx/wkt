@@ -23,13 +23,16 @@ parse(Wkt) ->
     {start_list, Wkt2} ->
         parse_list(Wkt2);
     {end_list, _Wkt2} ->
+io:format("parse: end_list~n", []),
         ok;
     _ ->
         ok
     end.
 
+%parse_char([]) ->
+
 parse_char([H|T]=Wkt) ->
-    io:format("parse: ~c|~p)~n", [H, T]),
+    io:format("parse: ~c|~p~n", [H, T]),
     case H of
     $( ->
         {start_list, T};
@@ -46,12 +49,17 @@ parse_char([H|T]=Wkt) ->
     end.
 
 parse_list(Wkt) ->
+    %Foo = parse_list(Wkt, []),
+    %lists:reverse(Foo)
+%    {Res, _} = parse_list(Wkt, []),
+%    lists:reverse(Res).
     parse_list(Wkt, []).
 
 parse_list(Wkt, Acc) ->
     case parse_char(Wkt) of
     {end_list, Wkt2} ->
-        {lists:reverse(Acc), Wkt2};
+        io:format("parse_list: end_list: reverse: ~p ~p~n", [Acc, Wkt2]),
+        {Acc, Wkt2};
     {start_list, Wkt2} ->
         {List, Wkt3} = parse_list(Wkt2),
         parse_list_inner(Wkt3, [List|Acc]);
@@ -63,17 +71,39 @@ parse_list(Wkt, Acc) ->
     end.
 
 parse_list_inner(Wkt, Acc) ->
-    io:format("parse_list_inner:~p~n", [Acc]),
+    io:format("parse_list_inner:~p ~p~n", [Acc, Wkt]),
     case parse_char(Wkt) of
     {end_list, Wkt2} ->
-        %io:format("parse_list_inner: done: ~p~n", [Acc]),
-        {lists:reverse(Acc), Wkt2};
+        io:format("parse_list_inner: done: ~p ~p~n", [Acc, Wkt2]),
+        Acc2 = tuple_them(Acc),
+        {lists:reverse(Acc2), Wkt2};
     {space, Wkt2} ->
-        parse_list(Wkt2, Acc)
-%    {comma, Wkt2} ->
-%        {lists:reverse(Acc), Wkt2}
-%        %parse_list(Wkt2, Acc)
+        parse_list(Wkt2, Acc);
+    {comma, Wkt2} ->
+        io:format("parse_list_inner: (1) comma:~p ~p~n", [Acc, Wkt2]),
+        Acc2 = tuple_them(Acc),
+        parse_list(Wkt2, Acc2)
     end.
+
+% converts leading non-tuple elements to a tuple
+% i.e. [a,b,{c,d},{e,f}] -> [{a,b},{c,d},{e,f}]
+tuple_them(List) ->
+    tuple_them(List, []).
+%tuple_them([], Acc) ->
+%    io:format("tuple_them2: tail:~p ~n", [Acc]),
+%    [list_to_tuple(Acc)];
+% case when the comma is behind a parenthesis and not behind a number
+tuple_them([], Acc) when is_list(hd(Acc)) ->
+    io:format("tuple_them3: tail:~p ~n", [Acc]),
+    lists:reverse(Acc);
+tuple_them([], Acc) ->
+    io:format("tuple_them2: tail:~p ~n", [Acc]),
+    [list_to_tuple(Acc)];
+tuple_them([H|_T]=Rest, Acc) when is_tuple(H) ->
+    io:format("tuple_them: tail:~p ~p~n", [Acc, Rest]),
+    [list_to_tuple(Acc)|Rest];
+tuple_them([H|T], Acc) ->
+    tuple_them(T, [H|Acc]).
 
 
 parse_number([H|T]) ->
