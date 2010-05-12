@@ -158,17 +158,13 @@ parse_geometry(Wkt, Acc) ->
 
 % all keywords (the geometry type) become Erlang atoms
 parse_atom([H|T]) ->
-    io:format("(1) atom:~p~n", [H]),
     {Atom, Wkt} = parse_atom(T, [H]),
-    io:format("(2) atom:~p~n", [Atom]),
     {{parsed, list_to_atom(Atom)}, Wkt}.
 
 parse_atom([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
                               ((H >= $A) and (H =< $Z)) ->
-%    io:format("(1) parse_atom:~p~n", [H]),
     parse_atom(T, Acc ++ [H]);
 parse_atom(Wkt, Acc) ->
-%    io:format("(2) parse_atom:~p~n", [hd(Wkt)]),
     {Acc, Wkt}.
 
 parse_test() ->
