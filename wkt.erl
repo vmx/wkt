@@ -61,10 +61,6 @@ parse_char([H|T]=Wkt) ->
     end.
 
 parse_list(Wkt) ->
-    %Foo = parse_list(Wkt, []),
-    %lists:reverse(Foo)
-%    {Res, _} = parse_list(Wkt, []),
-%    lists:reverse(Res).
     parse_list(Wkt, []).
 
 parse_list(Wkt, Acc) ->
@@ -80,7 +76,6 @@ parse_list(Wkt, Acc) ->
         parse_list_inner(Wkt2, [Parsed|Acc]);
     {{parsed_geom, Geom}, Wkt2} ->
         io:format("parse_list: parsed_geom: ~p ~p~n", [Geom, Acc]),
-        %parse_list(Wkt2, [Geom|Acc]);
         parse_list_inner(Wkt2, [Geom|Acc]);
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
@@ -98,7 +93,6 @@ parse_list_inner(Wkt, Acc) ->
     {comma, Wkt2} ->
         io:format("parse_list_inner: (1) comma:~p ~p~n", [Acc, Wkt2]),
         Acc2 = tuple_them(Acc),
-        %Acc2 = Acc,
         parse_list(Wkt2, Acc2)
     end.
 
@@ -106,9 +100,6 @@ parse_list_inner(Wkt, Acc) ->
 % i.e. [a,b,{c,d},{e,f}] -> [{a,b},{c,d},{e,f}]
 tuple_them(List) ->
     tuple_them(List, []).
-%tuple_them([], Acc) ->
-%    io:format("tuple_them2: tail:~p ~n", [Acc]),
-%    [list_to_tuple(Acc)];
 % case when the comma is behind a parenthesis and not behind a number
 tuple_them([], Acc) when is_list(hd(Acc)) ->
     io:format("tuple_them3: tail:~p ~n", [Acc]),
@@ -117,10 +108,6 @@ tuple_them([], Acc) ->
     io:format("tuple_them2: tail:~p ~n", [Acc]),
     [list_to_tuple(Acc)];
 tuple_them([H|_T]=Rest, Acc) when is_tuple(H) ->
-%tuple_them([H|_T]=Rest, Acc) when is_tuple(H) and length(Acc)>=1 ->
-    %if length(Acc)>0 -> io:format("    > 0:~p ~p ~p~n", [Acc, Rest, length(Acc)]);
-    %    true -> io:format("    == 0:~p ~p ~p~n", [Acc, Rest, length(Acc)])
-    %end,
     io:format(" tuple_them: tail:~p ~p ~p~n", [Acc, Rest, length(Acc)]),
     case Acc of
     [] ->
@@ -155,7 +142,6 @@ parse_number(Wkt, Acc) ->
 
 parse_geometry(Wkt) ->
     {{parsed, Atom}, Wkt2} = parse_atom(Wkt),
-    %{{parsed_list, List}, Wkt3} = parse_geometry(Wkt2, []),
     case parse_geometry(Wkt2, []) of
     {{parsed_list, List}, Wkt3} ->
         {{parsed_geom, {Atom, List}}, Wkt3};
@@ -168,13 +154,8 @@ parse_geometry(Wkt, Acc) ->
     case parse_char(Wkt) of
     {space, Wkt2} ->
         parse_geometry(Wkt2, Acc);
-%    {comma, Wkt2} ->
-%        io:format("parse_geometry: comma~p~n", [Acc]),
-%        parse_geometry(Wkt2, Acc);
     {start_list, Wkt2} ->
         parse_list(Wkt2);
-%        %{{parsed_list, List}, Wkt3} = parse_list(Wkt2);
-%        parse_list_inner(Wkt2, Acc);
     Geometry ->
         Geometry
     end.
