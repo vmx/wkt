@@ -13,6 +13,9 @@
 %MultiLineString((10 10, 20 20), (15 15, 30 15))
 
 
+% TODO:
+% parse empty lists ()
+
 -module(wkt).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -21,10 +24,16 @@
 parse(Wkt) ->
     case parse_char(Wkt) of
     {start_list, Wkt2} ->
-        parse_list(Wkt2);
-    {end_list, _Wkt2} ->
+        %{List, _Wkt} = parse_list(Wkt2),
+        {{parsed_list, List}, _Wkt} = parse_list(Wkt2),
+        List;
+    {end_list, _Wkt} ->
 io:format("parse: end_list~n", []),
         ok;
+    {{parsed, Atom}, _Wkt} ->
+        Atom;
+    {{parsed_geom, Geom}, _Wkt} ->
+        Geom;
     _ ->
         ok
     end.
@@ -42,6 +51,9 @@ parse_char([H|T]=Wkt) ->
         {comma, T};
     C when ((C >= $0) and (C =< $9)) ->
         parse_number(Wkt);
+    C when ((C >= $a) and (C =< $z)) orelse ((C >= $A) and (C =< $Z)) ->
+        %parse_atom(Wkt);
+        parse_geometry(Wkt);
     $\s ->
         {space, T};
     _ ->
@@ -61,7 +73,7 @@ parse_list(Wkt, Acc) ->
         io:format("parse_list: end_list: reverse: ~p ~p~n", [Acc, Wkt2]),
         {Acc, Wkt2};
     {start_list, Wkt2} ->
-        {List, Wkt3} = parse_list(Wkt2),
+        {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
         io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
@@ -76,7 +88,7 @@ parse_list_inner(Wkt, Acc) ->
     {end_list, Wkt2} ->
         io:format("parse_list_inner: done: ~p ~p~n", [Acc, Wkt2]),
         Acc2 = tuple_them(Acc),
-        {lists:reverse(Acc2), Wkt2};
+        {{parsed_list, lists:reverse(Acc2)}, Wkt2};
     {space, Wkt2} ->
         parse_list(Wkt2, Acc);
     {comma, Wkt2} ->
@@ -127,6 +139,34 @@ parse_number(Wkt, Acc) ->
 
 
 
+parse_geometry(Wkt) ->
+    {{parsed, Atom}, Wkt2} = parse_atom(Wkt),
+    {{parsed_list, List}, Wkt3} = parse_geometry(Wkt2, []),
+    {{parsed_geom, {Atom, List}}, Wkt3}.
+
+parse_geometry(Wkt, Acc) ->
+    case parse_char(Wkt) of
+    {space, Wkt2} ->
+        parse_geometry(Wkt2, Acc);
+    {start_list, Wkt2} ->
+        parse_list(Wkt2)
+    end.
+
+
+% all keywords (the geometry type) become Erlang atoms
+parse_atom([H|T]) ->
+    io:format("(1) atom:~p~n", [H]),
+    {Atom, Wkt} = parse_atom(T, [H]),
+    io:format("(2) atom:~p~n", [Atom]),
+    {{parsed, list_to_atom(Atom)}, Wkt}.
+
+parse_atom([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
+                              ((H >= $A) and (H =< $Z)) ->
+%    io:format("(1) parse_atom:~p~n", [H]),
+    parse_atom(T, Acc ++ [H]);
+parse_atom(Wkt, Acc) ->
+%    io:format("(2) parse_atom:~p~n", [hd(Wkt)]),
+    {Acc, Wkt}.
 
 parse_test() ->
     %Result = parse("(10 11 13, 21 23 46, 47 58 69)"),
