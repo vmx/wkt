@@ -121,13 +121,8 @@ tuple_them([H|T], Acc) ->
 
 parse_number([H|T]) ->
     io:format("parse_number:~c~n", [H]),
-    case parse_number(T, [H]) of
-    {{number, Num}, Wkt} ->
-        %parse_number(T, [H] ++ [Num]);
-        {{parsed, erlang:list_to_integer(Num)}, Wkt};
-    {no_number} ->
-        T
-    end.
+    {{number, Num}, Wkt} = parse_number(T, [H]),
+    {{parsed, erlang:list_to_integer(Num)}, Wkt}.
 
 %parse_number([], Acc) ->
 %    {number, Acc};
