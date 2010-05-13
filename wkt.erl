@@ -30,10 +30,8 @@ parse(Wkt) ->
     {end_list, _Wkt} ->
 io:format("parse: end_list~n", []),
         ok;
-    {{parsed, Atom}, _Wkt} ->
-        Atom;
-    {{parsed_geom, Geom}, _Wkt} ->
-        Geom;
+    {{parsed, Parsed}, _Wkt} ->
+        Parsed;
     _ ->
         ok
     end.
@@ -74,9 +72,6 @@ parse_list(Wkt, Acc) ->
     {{parsed, Parsed}, Wkt2} ->
         io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
         parse_list_inner(Wkt2, [Parsed|Acc]);
-    {{parsed_geom, Geom}, Wkt2} ->
-        io:format("parse_list: parsed_geom: ~p ~p~n", [Geom, Acc]),
-        parse_list_inner(Wkt2, [Geom|Acc]);
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
     end.
@@ -139,7 +134,7 @@ parse_geometry(Wkt) ->
     {{parsed, Atom}, Wkt2} = parse_atom(Wkt),
     case parse_geometry(Wkt2, []) of
     {{parsed_list, List}, Wkt3} ->
-        {{parsed_geom, {Atom, List}}, Wkt3};
+        {{parsed, {Atom, List}}, Wkt3};
     {Geom, _Wkt3} ->
         io:format("parse_geometry:~p~n", [Geom]),
         Geom
