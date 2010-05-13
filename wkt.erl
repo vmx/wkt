@@ -12,10 +12,6 @@
 % For OGC specification:
 %MultiLineString((10 10, 20 20), (15 15, 30 15))
 
-
-% TODO:
-% parse empty lists ()
-
 -module(wkt).
 -include_lib("eunit/include/eunit.hrl").
 
