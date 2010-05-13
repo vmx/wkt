@@ -44,7 +44,6 @@ parse_list(Wkt, Acc) ->
         {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
-io:format("parse_list: ~p~n", [Parsed]),
         parse_list_inner(Wkt2, [Parsed|Acc]);
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
