@@ -35,7 +35,7 @@ parse_char([H|T]=Wkt) ->
         {end_list, T};
     $, ->
         {comma, T};
-    C when ((C >= $0) and (C =< $9)) ->
+    C when ((C >= $0) and (C =< $9)) orelse (C == $-)->
         parse_number(Wkt);
     C when ((C >= $a) and (C =< $z)) orelse ((C >= $A) and (C =< $Z)) ->
         parse_geometry(Wkt);
@@ -95,13 +95,22 @@ tuple_them([H|T], Acc) ->
 
 
 parse_number([H|T]) ->
-    {{number, Num}, Wkt} = parse_number(T, [H]),
-    {{parsed, erlang:list_to_integer(Num)}, Wkt}.
+    {Num, Type, Wkt} = parse_number(T, int, [H]),
+    case Type of
+    int ->
+        {{parsed, list_to_integer(Num)}, Wkt};
+    float ->
+        {{parsed, list_to_float(Num)}, Wkt}
+    end.
 
-parse_number([H|T], Acc) when (H >= $0) and (H =< $9) ->
-    parse_number(T, [H|Acc]);
-parse_number(Wkt, Acc) ->
-    {{number, lists:reverse(Acc)}, Wkt}.
+parse_number([H|T], float, Acc) when H == $E orelse H == $- ->
+    parse_number(T, float, [H|Acc]);
+parse_number([H|T], Type, Acc) when (H >= $0) and (H =< $9) ->
+    parse_number(T, Type, [H|Acc]);
+parse_number([H|T], Type, Acc) when H == $. ->
+    parse_number(T, float, [H|Acc]);
+parse_number(Wkt, Type, Acc) ->
+    {lists:reverse(Acc), Type, Wkt}.
 
 
 
