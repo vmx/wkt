@@ -221,6 +221,7 @@ parse_geom_linestring_test() ->
     ?assertEqual({linestring, [{12, 13}, {14, 15}]},
                  parse("LINESTRING (12 13, 14 15)")).
 
+% the geometry of triangles are equal to ones of polygons
 parse_geom_polygon_test() ->
     ?assertEqual({polygon, []},
                  parse("POLYGON EMPTY")),
@@ -250,6 +251,7 @@ parse_geom_multilinestring_test() ->
                                     [{16, 17}, {18, 19}]]},
                  parse("MULTILINESTRING ((12 13, 14 15), (16 17, 18 19))")).
 
+% the geometry of polyhedralsurfaces/tins are equal to ones of multipolygons
 parse_geom_multipolygon_test() ->
     ?assertEqual({multipolygon, []},
                  parse("MULTIPOLYGON EMPTY")),
