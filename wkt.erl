@@ -23,21 +23,22 @@
 
 parse(Wkt) ->
     case parse_char(Wkt) of
-    {start_list, Wkt2} ->
-        %{List, _Wkt} = parse_list(Wkt2),
-        {{parsed_list, List}, _Wkt} = parse_list(Wkt2),
-        List;
-    {end_list, _Wkt} ->
-io:format("parse: end_list~n", []),
-        ok;
+%    {start_list, Wkt2} ->
+%        {{parsed_list, List}, _Wkt} = parse_list(Wkt2),
+%        List;
+%    {end_list, _Wkt} ->
+%io:format("parse: end_list~n", []),
+%        ok;
     {{parsed, Parsed}, _Wkt} ->
         Parsed;
+    {space, Wkt2} ->
+        parse(Wkt2);
     _ ->
-        ok
+        error
     end.
 
 %parse_char([]) ->
-
+%    ok;
 parse_char([H|T]=Wkt) ->
     io:format("parse: ~c|~p~n", [H, T]),
     case H of
@@ -50,7 +51,6 @@ parse_char([H|T]=Wkt) ->
     C when ((C >= $0) and (C =< $9)) ->
         parse_number(Wkt);
     C when ((C >= $a) and (C =< $z)) orelse ((C >= $A) and (C =< $Z)) ->
-        %parse_atom(Wkt);
         parse_geometry(Wkt);
     $\s ->
         {space, T};
@@ -68,6 +68,7 @@ parse_list(Wkt, Acc) ->
         {Acc, Wkt2};
     {start_list, Wkt2} ->
         {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
+        io:format("parse_list: start_list: ~p ~p ~p~n", [List, Wkt3, Acc]),
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
         io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
@@ -75,6 +76,7 @@ parse_list(Wkt, Acc) ->
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
     end.
+
 
 parse_list_inner(Wkt, Acc) ->
     io:format("parse_list_inner:~p ~p~n", [Acc, Wkt]),
@@ -103,7 +105,7 @@ tuple_them([], Acc) ->
     io:format("tuple_them2: tail:~p ~n", [Acc]),
     [list_to_tuple(Acc)];
 tuple_them([H|_T]=Rest, Acc) when is_tuple(H) ->
-    io:format(" tuple_them: tail:~p ~p ~p~n", [Acc, Rest, length(Acc)]),
+    io:format("tuple_them: tail:~p ~p ~p~n", [Acc, Rest, length(Acc)]),
     case Acc of
     [] ->
         Rest;
@@ -132,22 +134,15 @@ parse_number(Wkt, Acc) ->
 
 parse_geometry(Wkt) ->
     {{parsed, Atom}, Wkt2} = parse_atom(Wkt),
-    case parse_geometry(Wkt2, []) of
-    {{parsed_list, List}, Wkt3} ->
-        {{parsed, {Atom, List}}, Wkt3};
-    {Geom, _Wkt3} ->
-        io:format("parse_geometry:~p~n", [Geom]),
-        Geom
-    end.
+    {{parsed_list, List}, Wkt3} = parse_geometry_inner(Wkt2),
+    {{parsed, {Atom, List}}, Wkt3}.
 
-parse_geometry(Wkt, Acc) ->
+parse_geometry_inner(Wkt) ->
     case parse_char(Wkt) of
     {space, Wkt2} ->
-        parse_geometry(Wkt2, Acc);
+        parse_geometry_inner(Wkt2);
     {start_list, Wkt2} ->
-        parse_list(Wkt2);
-    Geometry ->
-        Geometry
+        parse_list(Wkt2)
     end.
 
 
@@ -157,10 +152,12 @@ parse_atom([H|T]) ->
     {{parsed, list_to_atom(Atom)}, Wkt}.
 
 parse_atom([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
-                              ((H >= $A) and (H =< $Z)) ->
-    parse_atom(T, Acc ++ [H]);
+                            ((H >= $A) and (H =< $Z)) orelse
+                            H == $\s ->
+    parse_atom(T, [H|Acc]);
 parse_atom(Wkt, Acc) ->
-    {Acc, Wkt}.
+    Stripped = string:strip(Acc, left),
+    {lists:reverse(Stripped), Wkt}.
 
 parse_test() ->
     %Result = parse("(10 11 13, 21 23 46, 47 58 69)"),
