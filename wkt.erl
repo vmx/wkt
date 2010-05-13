@@ -298,3 +298,18 @@ parse_geom_geometrycollection_test() ->
                        "POLYGON ((102 103, 204 205, 306 107, 102 103),"
                        "(12 13, 24 25, 36 17, 12 13),"
                        "(62 63, 74 75, 86 67, 62 63)))")).
+
+% It's the same for all other geometries
+parse_geom_with_space_test() ->
+    ?assertEqual({'point z',[]}, parse("POINT Z EMPTY")),
+    ?assertEqual({'point z',[]}, parse("POINT Z  EMPTY")),
+    ?assertEqual({'point z',[{12, 13, 14}]},
+                 parse("POINT Z (12 13 14)")),
+    ?assertEqual({'point z',[{12, 13, 14}]},
+                 parse("POINT Z  (12 13 14)")),
+    ?assertEqual({'point zm',[]}, parse("POINT ZM EMPTY")),
+    ?assertEqual({'point zm',[]}, parse("POINT ZM  EMPTY")),
+    ?assertEqual({'point zm',[{12, 13, 14, 15}]},
+                 parse("POINT ZM (12 13 14 15)")),
+    ?assertEqual({'point zm',[{12, 13, 14, 15}]},
+                 parse("POINT ZM  (12 13 14 15)")).
