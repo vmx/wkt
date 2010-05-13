@@ -57,7 +57,7 @@ parse_list(Wkt) ->
 parse_list(Wkt, Acc) ->
     case parse_char(Wkt) of
     {end_list, Wkt2} ->
-        {Acc, Wkt2};
+        {{parsed_list, Acc}, Wkt2};
     {start_list, Wkt2} ->
         {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
         parse_list_inner(Wkt3, [List|Acc]);
