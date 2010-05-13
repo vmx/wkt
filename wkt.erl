@@ -31,8 +31,6 @@ parse(Wkt) ->
         error
     end.
 
-%parse_char([]) ->
-%    ok;
 parse_char([H|T]=Wkt) ->
     case H of
     $( ->
