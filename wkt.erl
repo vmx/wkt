@@ -23,12 +23,6 @@
 
 parse(Wkt) ->
     case parse_char(Wkt) of
-%    {start_list, Wkt2} ->
-%        {{parsed_list, List}, _Wkt} = parse_list(Wkt2),
-%        List;
-%    {end_list, _Wkt} ->
-%io:format("parse: end_list~n", []),
-%        ok;
     {{parsed, Parsed}, _Wkt} ->
         Parsed;
     {space, Wkt2} ->
@@ -40,7 +34,6 @@ parse(Wkt) ->
 %parse_char([]) ->
 %    ok;
 parse_char([H|T]=Wkt) ->
-    io:format("parse: ~c|~p~n", [H, T]),
     case H of
     $( ->
         {start_list, T};
@@ -64,14 +57,11 @@ parse_list(Wkt) ->
 parse_list(Wkt, Acc) ->
     case parse_char(Wkt) of
     {end_list, Wkt2} ->
-        io:format("parse_list: end_list: reverse: ~p ~p~n", [Acc, Wkt2]),
         {Acc, Wkt2};
     {start_list, Wkt2} ->
         {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
-        io:format("parse_list: start_list: ~p ~p ~p~n", [List, Wkt3, Acc]),
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
-        io:format("parse_list: parsed: ~p ~p~n", [Parsed, Acc]),
         parse_list_inner(Wkt2, [Parsed|Acc]);
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
@@ -79,16 +69,13 @@ parse_list(Wkt, Acc) ->
 
 
 parse_list_inner(Wkt, Acc) ->
-    io:format("parse_list_inner:~p ~p~n", [Acc, Wkt]),
     case parse_char(Wkt) of
     {end_list, Wkt2} ->
-        io:format("parse_list_inner: done: ~p ~p~n", [Acc, Wkt2]),
         Acc2 = tuple_them(Acc),
         {{parsed_list, lists:reverse(Acc2)}, Wkt2};
     {space, Wkt2} ->
         parse_list(Wkt2, Acc);
     {comma, Wkt2} ->
-        io:format("parse_list_inner: (1) comma:~p ~p~n", [Acc, Wkt2]),
         Acc2 = tuple_them(Acc),
         parse_list(Wkt2, Acc2)
     end.
@@ -99,13 +86,10 @@ tuple_them(List) ->
     tuple_them(List, []).
 % case when the comma is behind a parenthesis and not behind a number
 tuple_them([], Acc) when is_list(hd(Acc)) ->
-    io:format("tuple_them3: tail:~p ~n", [Acc]),
     lists:reverse(Acc);
 tuple_them([], Acc) ->
-    io:format("tuple_them2: tail:~p ~n", [Acc]),
     [list_to_tuple(Acc)];
 tuple_them([H|_T]=Rest, Acc) when is_tuple(H) ->
-    io:format("tuple_them: tail:~p ~p ~p~n", [Acc, Rest, length(Acc)]),
     case Acc of
     [] ->
         Rest;
@@ -117,18 +101,13 @@ tuple_them([H|T], Acc) ->
 
 
 parse_number([H|T]) ->
-    io:format("parse_number:~c~n", [H]),
     {{number, Num}, Wkt} = parse_number(T, [H]),
     {{parsed, erlang:list_to_integer(Num)}, Wkt}.
 
-%parse_number([], Acc) ->
-%    {number, Acc};
 parse_number([H|T], Acc) when (H >= $0) and (H =< $9) ->
-    %{number, H};
-    parse_number(T, Acc ++ [H]);
-% end of number/recursion
+    parse_number(T, [H|Acc]);
 parse_number(Wkt, Acc) ->
-    {{number, Acc}, Wkt}.
+    {{number, lists:reverse(Acc)}, Wkt}.
 
 
 
@@ -158,6 +137,7 @@ parse_atom([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
 parse_atom(Wkt, Acc) ->
     Stripped = string:strip(Acc, left),
     {lists:reverse(Stripped), Wkt}.
+
 
 parse_test() ->
     %Result = parse("(10 11 13, 21 23 46, 47 58 69)"),
