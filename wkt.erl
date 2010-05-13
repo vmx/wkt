@@ -5,7 +5,6 @@
 
 -export([parse/1]).
 
-% TODO: support EMPTY instead of ().
 
 parse(Wkt) ->
     case parse_char(Wkt) of
