@@ -46,6 +46,7 @@ parse_list(Wkt, Acc) ->
         {{parsed_list, List}, Wkt3} = parse_list(Wkt2),
         parse_list_inner(Wkt3, [List|Acc]);
     {{parsed, Parsed}, Wkt2} ->
+io:format("parse_list: ~p~n", [Parsed]),
         parse_list_inner(Wkt2, [Parsed|Acc]);
     {space, Wkt2} ->
         parse_list(Wkt2, Acc)
@@ -107,9 +108,13 @@ parse_number(Wkt, Type, Acc) ->
 
 
 parse_geometry(Wkt) ->
-    {{parsed, Atom}, Wkt2} = parse_atom(Wkt),
-    {{parsed_list, List}, Wkt3} = parse_geometry_inner(Wkt2),
-    {{parsed, {Atom, List}}, Wkt3}.
+    case parse_string(Wkt) of
+    {{parsed_atom, Atom}, Wkt2} ->
+        {{parsed_list, List}, Wkt3} = parse_geometry_inner(Wkt2),
+        {{parsed, {Atom, List}}, Wkt3};
+    {{parsed_empty, Atom}, Wkt2} ->
+        {{parsed, {Atom, []}}, Wkt2}
+    end.
 
 parse_geometry_inner(Wkt) ->
     case parse_char(Wkt) of
@@ -121,19 +126,42 @@ parse_geometry_inner(Wkt) ->
 
 
 % all keywords (the geometry type) become Erlang atoms
-parse_atom([H|T]) ->
-    {Atom, Wkt} = parse_atom(T, [H]),
-    {{parsed, list_to_atom(Atom)}, Wkt}.
+parse_string([H|T]) ->
+    %{String, Wkt} = parse_string(T, [H]),
+    case parse_string(T, [H]) of
+    {{type, Type}, Wkt} ->
+        {{parsed_atom, list_to_atom(Type)}, Wkt};
+    {{empty_type, Type}, Wkt} ->
+        {{parsed_empty, list_to_atom(Type)}, Wkt}
+    end.
 
-parse_atom([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
+parse_string([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
                             ((H >= $A) and (H =< $Z)) orelse
                             H == $\s ->
-    parse_atom(T, [H|Acc]);
-parse_atom(Wkt, Acc) ->
+    parse_string(T, [H|Acc]);
+parse_string(Wkt, Acc) ->
     Stripped = string:strip(Acc, left),
-    {lists:reverse(string:to_lower(Stripped)), Wkt}.
+    try
+        "YTPME " ++ Geometry = Stripped,
+        Stripped2 = string:strip(Geometry, left),
+        {{empty_type, lists:reverse(string:to_lower(Stripped2))}, Wkt}
+    catch _:_ ->
+        {{type, lists:reverse(string:to_lower(Stripped))}, Wkt}
+    end.
 
 
+
+parse_whitespace_empty_test() ->
+    Point = {point, []},
+    GC = {geometrycollection, [Point]},
+    ?assertEqual(Point, parse("POINT EMPTY")),
+    ?assertEqual(Point, parse("POINT  EMPTY")),
+    ?assertEqual(Point, parse("POINT   EMPTY")),
+    ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT EMPTY)")),
+    ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT EMPTY )")),
+    ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT EMPTY  )")),
+    ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT  EMPTY  )")),
+    ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT   EMPTY  )")).
 
 parse_whitespace_single_test() ->
     Point = {point, [{12, 13}]},
@@ -188,13 +216,18 @@ parse_whitespace_geometrycollection_test() ->
 
 
 parse_geom_point_test() ->
+    ?assertEqual({point, []}, parse("POINT EMPTY)")),
     ?assertEqual({point, [{12, 13}]}, parse("POINT (12 13)")).
 
 parse_geom_linestring_test() ->
+    ?assertEqual({linestring, []},
+                 parse("LINESTRING EMPTY")),
     ?assertEqual({linestring, [{12, 13}, {14, 15}]},
                  parse("LINESTRING (12 13, 14 15)")).
 
 parse_geom_polygon_test() ->
+    ?assertEqual({polygon, []},
+                 parse("POLYGON EMPTY")),
     ?assertEqual({polygon, [[{12, 13}, {24, 25}, {36, 17}, {12, 13}]]},
                  parse("POLYGON ((12 13, 24 25, 36 17, 12 13))")),
     ?assertEqual({polygon, [[{102, 103}, {204, 205}, {306, 107}, {102, 103}],
@@ -209,15 +242,21 @@ parse_geom_polygon_test() ->
                        "(62 63, 74 75, 86 67, 62 63))")).
 
 parse_geom_multipoint_test() ->
+    ?assertEqual({multipoint, []},
+                 parse("MULTIPOINT EMPTY")),
     ?assertEqual({multipoint, [{12, 13}, {14, 15}]},
                  parse("MULTIPOINT (12 13, 14 15)")).
 
 parse_geom_multilinestring_test() ->
+    ?assertEqual({multilinestring, []},
+                 parse("MULTILINESTRING EMPTY")),
     ?assertEqual({multilinestring, [[{12, 13}, {14, 15}],
                                     [{16, 17}, {18, 19}]]},
                  parse("MULTILINESTRING ((12 13, 14 15), (16 17, 18 19))")).
 
 parse_geom_multipolygon_test() ->
+    ?assertEqual({multipolygon, []},
+                 parse("MULTIPOLYGON EMPTY")),
     ?assertEqual({multipolygon, [[[{12, 13}, {24, 25}, {36, 17}, {12, 13}]],
                                  [[{2012, 2013}, {2024, 2025},
                                    {2036, 2017}, {2012, 2013}]]]},
@@ -235,6 +274,17 @@ parse_geom_multipolygon_test() ->
                        "(2012 2013, 2024 2025, 2036 2017, 2012 2013)))")).
 
 parse_geom_geometrycollection_test() ->
+    ?assertEqual({geometrycollection,[]},
+                 parse("GEOMETRYCOLLECTION EMPTY")),
+    ?assertEqual({geometrycollection,[{point, []}]},
+                 parse("GEOMETRYCOLLECTION (POINT EMPTY)")),
+    ?assertEqual({geometrycollection,[{point, []}, {multipoint, []}]},
+                 parse("GEOMETRYCOLLECTION (POINT EMPTY, MULTIPOINT EMPTY)")),
+    ?assertEqual({geometrycollection,[{point, []},
+                                      {multipoint, [{12, 13}, {14, 15}]}]},
+                 parse("GEOMETRYCOLLECTION(POINT EMPTY,"
+                       "MULTIPOINT (12 13, 14 15))")),
+
     ?assertEqual({geometrycollection,[{point, [{12, 13}]}]},
                  parse("GEOMETRYCOLLECTION(POINT (12 13))")),
     ?assertEqual({geometrycollection,[{point, [{12, 13}]},
