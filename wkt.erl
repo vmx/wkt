@@ -1,4 +1,28 @@
-% The code is heavily based on MochiWeb's JSON decoder.
+% This software is licensed under the MIT License
+% Copyright (c) 2010 Volker Mische (http://vmx.cx/)
+
+% Permission is hereby granted, free of charge, to any person obtaining a copy
+% of this software and associated documentation files (the "Software"), to deal
+% in the Software without restriction, including without limitation the rights
+% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+% copies of the Software, and to permit persons to whom the Software is
+% furnished to do so, subject to the following conditions:
+
+% The above copyright notice and this permission notice shall be included in
+% all copies or substantial portions of the Software.
+
+% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+% THE SOFTWARE.
+
+% This code is heavily based on the ideas of the MochiWeb's JSON2 decoder
+% http://code.google.com/p/mochiweb/source/browse/trunk/src/mochijson2.erl
+% (Copyright 2006 Mochi Media, Inc.)
+
 
 -module(wkt).
 -include_lib("eunit/include/eunit.hrl").
@@ -24,7 +48,7 @@ parse_char([H|T]=Wkt) ->
         {end_list, T};
     $, ->
         {comma, T};
-    C when ((C >= $0) and (C =< $9)) orelse (C == $-)->
+    C when ((C >= $0) and (C =< $9)) orelse (C == $-) orelse (C == $+) ->
         parse_number(Wkt);
     C when ((C >= $a) and (C =< $z)) orelse ((C >= $A) and (C =< $Z)) ->
         parse_geometry(Wkt);
@@ -93,7 +117,7 @@ parse_number([H|T]) ->
         {{parsed, list_to_float(Num)}, Wkt}
     end.
 
-parse_number([H|T], float, Acc) when H == $E orelse H == $- ->
+parse_number([H|T], float, Acc) when H == $E orelse H == $- orelse H == $+ ->
     parse_number(T, float, [H|Acc]);
 parse_number([H|T], Type, Acc) when (H >= $0) and (H =< $9) ->
     parse_number(T, Type, [H|Acc]);
@@ -146,6 +170,27 @@ parse_string(Wkt, Acc) ->
     end.
 
 
+parse_number_test() ->
+    ?assertEqual({point, [{12, 13}]}, parse("POINT(12 13)")),
+    ?assertEqual({point, [{12.0, 13}]}, parse("POINT(12.0 13)")),
+    ?assertEqual({point, [{12.458, 13}]}, parse("POINT(12.458 13)")),
+    ?assertEqual({point, [{12, 13.4712}]}, parse("POINT(12 13.4712)")),
+    ?assertEqual({point, [{1280.0, 13}]}, parse("POINT(12.8E2 13)")),
+    ?assertEqual({point, [{0.128, 13}]}, parse("POINT(12.8E-2 13)")),
+    ?assertEqual({point, [{12.8, 132500.0}]}, parse("POINT(12.8 13.25E4)")),
+    ?assertEqual({point, [{12.8, 0.001325}]}, parse("POINT(12.8 13.25E-4)")),
+
+    ?assertEqual({point, [{12, -13}]}, parse("POINT(+12 -13)")),
+    ?assertEqual({point, [{-12.0, 13}]}, parse("POINT(-12.0 +13)")),
+    ?assertEqual({point, [{-12.458, 13}]}, parse("POINT(-12.458 13)")),
+    ?assertEqual({point, [{12, -13.4712}]}, parse("POINT(  +12  -13.4712)")),
+    ?assertEqual({point, [{-1280.0, 0.001325}]},
+                 parse("POINT(-12.8E2 +13.25E-4)")),
+    ?assertEqual({point, [{0.128, 132500.0}]},
+                 parse("POINT(+12.8E-2 13.25E+4)")),
+    ?assertEqual({point, [{0.128, -132500.0}]},
+                 parse("POINT(+12.8E-2 -13.25E+4)")).
+    
 
 parse_whitespace_empty_test() ->
     Point = {point, []},
