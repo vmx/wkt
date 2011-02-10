@@ -32,7 +32,7 @@ A validating parser would be much slower as it would also need to
 perform checks on the geometry, e.g. for polygons whether interiors
 are really within the exterior ring or not.
 
-The general rule is, a list of coordinates is transformed to a tuple,
+The general rule is, a list of coordinates is transformed to a list,
 a list of coordinates to a list. The geometry name will be an
 atom. Here's an example for a polygon:
 
