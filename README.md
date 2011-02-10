@@ -37,9 +37,21 @@ a list of coordinates to a list. The geometry name will be an
 atom. Here's an example for a polygon:
 
     wkt:parse("POLYGON ((102 103, 204 205, 306 107, 102 103), (12 13, 24 25, 36 17, 12 13), (62 63, 74 75, 86 67, 62 63))").
-    {polygon,[[{102,103},{204,205},{306,107},{102,103}],
+    {Polygon,[[{102,103},{204,205},{306,107},{102,103}],
               [{12,13},{24,25},{36,17},{12,13}],
               [{62,63},{74,75},{86,67},{62,63}]]}
+
+The atoms will be all lowercase for arbitrary strings, but camel cased
+for the geometries that are also known from the GeoJSON specification
+(where the case matters). Those are:
+
+ - Point
+ - MultiPoint
+ - LineString
+ - MultiLineString
+ - Polygon
+ - MultiPolygon
+ - GeometryCollection
 
 
 Running the tests

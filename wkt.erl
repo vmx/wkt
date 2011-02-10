@@ -151,12 +151,27 @@ parse_geometry_inner(Wkt) ->
 % all keywords (the geometry type) become Erlang atoms
 parse_string([H|T]) ->
     %{String, Wkt} = parse_string(T, [H]),
-    case parse_string(T, [H]) of
+    {{Type2, String}, Wkt2} = case parse_string(T, [H]) of
     {{type, Type}, Wkt} ->
         {{parsed_atom, list_to_atom(Type)}, Wkt};
     {{empty_type, Type}, Wkt} ->
         {{parsed_empty, list_to_atom(Type)}, Wkt}
-    end.
+    end,
+    % The WKT specification doesn't say anything about the case of the
+    % letters, therefore we transform them to camel case style, like in
+    % GeoJSON specification
+    String2 = case String of
+        point -> 'Point';
+        multipoint -> 'MultiPoint';
+        linestring -> 'LineString';
+        multilinestring -> 'MultiLineString';
+        polygon -> 'Polygon';
+        multipolygon -> 'MultiPolygon';
+        geometrycollection -> 'GeometryCollection';
+        _ -> String
+    end,
+    {{Type2, String2}, Wkt2}.
+
 
 parse_string([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
                             ((H >= $A) and (H =< $Z)) orelse
@@ -174,30 +189,30 @@ parse_string(Wkt, Acc) ->
 
 
 parse_number_test() ->
-    ?assertEqual({point, [12, 13]}, parse("POINT(12 13)")),
-    ?assertEqual({point, [12.0, 13]}, parse("POINT(12.0 13)")),
-    ?assertEqual({point, [12.458, 13]}, parse("POINT(12.458 13)")),
-    ?assertEqual({point, [12, 13.4712]}, parse("POINT(12 13.4712)")),
-    ?assertEqual({point, [1280.0, 13]}, parse("POINT(12.8E2 13)")),
-    ?assertEqual({point, [0.128, 13]}, parse("POINT(12.8E-2 13)")),
-    ?assertEqual({point, [12.8, 132500.0]}, parse("POINT(12.8 13.25E4)")),
-    ?assertEqual({point, [12.8, 0.001325]}, parse("POINT(12.8 13.25E-4)")),
+    ?assertEqual({'Point', [12, 13]}, parse("POINT(12 13)")),
+    ?assertEqual({'Point', [12.0, 13]}, parse("POINT(12.0 13)")),
+    ?assertEqual({'Point', [12.458, 13]}, parse("POINT(12.458 13)")),
+    ?assertEqual({'Point', [12, 13.4712]}, parse("POINT(12 13.4712)")),
+    ?assertEqual({'Point', [1280.0, 13]}, parse("POINT(12.8E2 13)")),
+    ?assertEqual({'Point', [0.128, 13]}, parse("POINT(12.8E-2 13)")),
+    ?assertEqual({'Point', [12.8, 132500.0]}, parse("POINT(12.8 13.25E4)")),
+    ?assertEqual({'Point', [12.8, 0.001325]}, parse("POINT(12.8 13.25E-4)")),
 
-    ?assertEqual({point, [12, -13]}, parse("POINT(+12 -13)")),
-    ?assertEqual({point, [-12.0, 13]}, parse("POINT(-12.0 +13)")),
-    ?assertEqual({point, [-12.458, 13]}, parse("POINT(-12.458 13)")),
-    ?assertEqual({point, [12, -13.4712]}, parse("POINT(  +12  -13.4712)")),
-    ?assertEqual({point, [-1280.0, 0.001325]},
+    ?assertEqual({'Point', [12, -13]}, parse("POINT(+12 -13)")),
+    ?assertEqual({'Point', [-12.0, 13]}, parse("POINT(-12.0 +13)")),
+    ?assertEqual({'Point', [-12.458, 13]}, parse("POINT(-12.458 13)")),
+    ?assertEqual({'Point', [12, -13.4712]}, parse("POINT(  +12  -13.4712)")),
+    ?assertEqual({'Point', [-1280.0, 0.001325]},
                  parse("POINT(-12.8E2 +13.25E-4)")),
-    ?assertEqual({point, [0.128, 132500.0]},
+    ?assertEqual({'Point', [0.128, 132500.0]},
                  parse("POINT(+12.8E-2 13.25E+4)")),
-    ?assertEqual({point, [0.128, -132500.0]},
+    ?assertEqual({'Point', [0.128, -132500.0]},
                  parse("POINT(+12.8E-2 -13.25E+4)")).
 
 
 parse_whitespace_empty_test() ->
-    Point = {point, []},
-    GC = {geometrycollection, [Point]},
+    Point = {'Point', []},
+    GC = {'GeometryCollection', [Point]},
     ?assertEqual(Point, parse("POINT EMPTY")),
     ?assertEqual(Point, parse("POINT  EMPTY")),
     ?assertEqual(Point, parse("POINT   EMPTY")),
@@ -208,7 +223,7 @@ parse_whitespace_empty_test() ->
     ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT   EMPTY  )")).
 
 parse_whitespace_single_test() ->
-    Point = {point, [12, 13]},
+    Point = {'Point', [12, 13]},
     ?assertEqual(Point, parse("POINT(12 13)")),
     ?assertEqual(Point, parse("POINT (12 13)")),
     ?assertEqual(Point, parse("POINT  (12 13)")),
@@ -220,7 +235,7 @@ parse_whitespace_single_test() ->
     ?assertEqual(Point, parse("POINT(12  13  )")).
 
 parse_whitespace_multi_test() ->
-    LS = {linestring, [[12, 13], [14, 15], [16, 17]]},
+    LS = {'LineString', [[12, 13], [14, 15], [16, 17]]},
     ?assertEqual(LS, parse("LINESTRING(12 13,14 15,16 17)")),
     ?assertEqual(LS, parse("LINESTRING(12 13, 14 15,16 17)")),
     ?assertEqual(LS, parse("LINESTRING(12 13,  14 15,16 17)")),
@@ -242,8 +257,8 @@ parse_whitespace_multi_test() ->
     ?assertEqual(LS, parse("LINESTRING(12 13,14 15,  16 17  )")).
 
 parse_whitespace_geometrycollection_test() ->
-    GC = {geometrycollection, [{point, [12, 13]}]},
-    GC2 = {geometrycollection, [{point, [12, 13]}, {point, [14, 15]}]},
+    GC = {'GeometryCollection', [{'Point', [12, 13]}]},
+    GC2 = {'GeometryCollection', [{'Point', [12, 13]}, {'Point', [14, 15]}]},
     ?assertEqual(GC, parse("GEOMETRYCOLLECTION( POINT(12 13))")),
     ?assertEqual(GC, parse("GEOMETRYCOLLECTION(  POINT(12 13))")),
     ?assertEqual(GC, parse("GEOMETRYCOLLECTION(POINT(12 13) )")),
@@ -260,26 +275,26 @@ parse_whitespace_geometrycollection_test() ->
 
 
 parse_geom_point_test() ->
-    ?assertEqual({point, []}, parse("POINT EMPTY)")),
-    ?assertEqual({point, [12, 13]}, parse("POINT (12 13)")).
+    ?assertEqual({'Point', []}, parse("POINT EMPTY)")),
+    ?assertEqual({'Point', [12, 13]}, parse("POINT (12 13)")).
 
 parse_geom_linestring_test() ->
-    ?assertEqual({linestring, []},
+    ?assertEqual({'LineString', []},
                  parse("LINESTRING EMPTY")),
-    ?assertEqual({linestring, [[12, 13], [14, 15]]},
+    ?assertEqual({'LineString', [[12, 13], [14, 15]]},
                  parse("LINESTRING (12 13, 14 15)")).
 
 % the geometry of triangles are equal to ones of polygons
 parse_geom_polygon_test() ->
-    ?assertEqual({polygon, []},
+    ?assertEqual({'Polygon', []},
                  parse("POLYGON EMPTY")),
-    ?assertEqual({polygon, [[[12, 13], [24, 25], [36, 17], [12, 13]]]},
+    ?assertEqual({'Polygon', [[[12, 13], [24, 25], [36, 17], [12, 13]]]},
                  parse("POLYGON ((12 13, 24 25, 36 17, 12 13))")),
-    ?assertEqual({polygon, [[[102, 103], [204, 205], [306, 107], [102, 103]],
+    ?assertEqual({'Polygon', [[[102, 103], [204, 205], [306, 107], [102, 103]],
                             [[12, 13], [24, 25], [36, 17], [12, 13]]]},
                  parse("POLYGON ((102 103, 204 205, 306 107, 102 103),"
                        "(12 13, 24 25, 36 17, 12 13))")),
-    ?assertEqual({polygon, [[[102, 103], [204, 205], [306, 107], [102, 103]],
+    ?assertEqual({'Polygon', [[[102, 103], [204, 205], [306, 107], [102, 103]],
                             [[12, 13], [24, 25], [36, 17], [12, 13]],
                             [[62, 63], [74, 75], [86, 67], [62, 63]]]},
                  parse("POLYGON ((102 103, 204 205, 306 107, 102 103),"
@@ -287,28 +302,28 @@ parse_geom_polygon_test() ->
                        "(62 63, 74 75, 86 67, 62 63))")).
 
 parse_geom_multipoint_test() ->
-    ?assertEqual({multipoint, []},
+    ?assertEqual({'MultiPoint', []},
                  parse("MULTIPOINT EMPTY")),
-    ?assertEqual({multipoint, [[12, 13], [14, 15]]},
+    ?assertEqual({'MultiPoint', [[12, 13], [14, 15]]},
                  parse("MULTIPOINT (12 13, 14 15)")).
 
 parse_geom_multilinestring_test() ->
-    ?assertEqual({multilinestring, []},
+    ?assertEqual({'MultiLineString', []},
                  parse("MULTILINESTRING EMPTY")),
-    ?assertEqual({multilinestring, [[[12, 13], [14, 15]],
+    ?assertEqual({'MultiLineString', [[[12, 13], [14, 15]],
                                     [[16, 17], [18, 19]]]},
                  parse("MULTILINESTRING ((12 13, 14 15), (16 17, 18 19))")).
 
 % the geometry of polyhedralsurfaces/tins are equal to ones of multipolygons
 parse_geom_multipolygon_test() ->
-    ?assertEqual({multipolygon, []},
+    ?assertEqual({'MultiPolygon', []},
                  parse("MULTIPOLYGON EMPTY")),
-    ?assertEqual({multipolygon, [[[[12, 13], [24, 25], [36, 17], [12, 13]]],
+    ?assertEqual({'MultiPolygon', [[[[12, 13], [24, 25], [36, 17], [12, 13]]],
                                  [[[2012, 2013], [2024, 2025],
                                    [2036, 2017], [2012, 2013]]]]},
                  parse("MULTIPOLYGON (((12 13, 24 25, 36 17, 12 13)),"
                        "((2012 2013, 2024 2025, 2036 2017, 2012 2013)))")),
-    ?assertEqual({multipolygon, [[[[102, 103], [204, 205], [306, 107], [102, 103]],
+    ?assertEqual({'MultiPolygon', [[[[102, 103], [204, 205], [306, 107], [102, 103]],
                                   [[12, 13], [24, 25], [36, 17], [12, 13]]],
                                  [[[2102, 2103], [2204, 2205],
                                    [2306, 2107], [2102, 2103]],
@@ -320,26 +335,26 @@ parse_geom_multipolygon_test() ->
                        "(2012 2013, 2024 2025, 2036 2017, 2012 2013)))")).
 
 parse_geom_geometrycollection_test() ->
-    ?assertEqual({geometrycollection,[]},
+    ?assertEqual({'GeometryCollection',[]},
                  parse("GEOMETRYCOLLECTION EMPTY")),
-    ?assertEqual({geometrycollection,[{point, []}]},
+    ?assertEqual({'GeometryCollection',[{'Point', []}]},
                  parse("GEOMETRYCOLLECTION (POINT EMPTY)")),
-    ?assertEqual({geometrycollection,[{point, []}, {multipoint, []}]},
+    ?assertEqual({'GeometryCollection',[{'Point', []}, {'MultiPoint', []}]},
                  parse("GEOMETRYCOLLECTION (POINT EMPTY, MULTIPOINT EMPTY)")),
-    ?assertEqual({geometrycollection,[{point, []},
-                                      {multipoint, [[12, 13], [14, 15]]}]},
+    ?assertEqual({'GeometryCollection',[{'Point', []},
+                                      {'MultiPoint', [[12, 13], [14, 15]]}]},
                  parse("GEOMETRYCOLLECTION(POINT EMPTY,"
                        "MULTIPOINT (12 13, 14 15))")),
 
-    ?assertEqual({geometrycollection,[{point, [12, 13]}]},
+    ?assertEqual({'GeometryCollection',[{'Point', [12, 13]}]},
                  parse("GEOMETRYCOLLECTION(POINT (12 13))")),
-    ?assertEqual({geometrycollection,[{point, [12, 13]},
-                                      {multipoint, [[12, 13], [14, 15]]}]},
+    ?assertEqual({'GeometryCollection',[{'Point', [12, 13]},
+                                      {'MultiPoint', [[12, 13], [14, 15]]}]},
                  parse("GEOMETRYCOLLECTION(POINT (12 13),"
                        "MULTIPOINT (12 13, 14 15))")),
-    ?assertEqual({geometrycollection,
-                  [{point, [12, 13]}, {point, [14, 15]},
-                   {polygon, [[[102, 103], [204, 205], [306, 107], [102, 103]],
+    ?assertEqual({'GeometryCollection',
+                  [{'Point', [12, 13]}, {'Point', [14, 15]},
+                   {'Polygon', [[[102, 103], [204, 205], [306, 107], [102, 103]],
                               [[12, 13], [24, 25], [36, 17], [12, 13]],
                               [[62, 63], [74, 75], [86, 67], [62, 63]]]}]},
                  parse("GEOMETRYCOLLECTION("
