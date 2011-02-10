@@ -41,6 +41,15 @@ atom. Here's an example for a polygon:
               [{12,13},{24,25},{36,17},{12,13}],
               [{62,63},{74,75},{86,67},{62,63}]]}
 
+
+Running the tests
+-----------------
+
+Running the EUnit tests is simple as:
+
+    erl -noshell -s wkt test -s init stop
+
+
 License
 -------
 
