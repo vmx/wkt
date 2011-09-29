@@ -15,7 +15,7 @@ the XML spec](http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation)):
     list ::= '(' geom (comma geom)* ')'
     geom ::= space* '(' coord (comma coord)* ')'
     coord ::= space* number (space+ number)*
-    number ::= integer | float 
+    number ::= integer | float
     integer ::=  ('-' | '+')? [0-9]+
     float ::= ('-' | '+')? [0-9]+ '.' [0-9]+ exponent?
     exponent = 'E' ('-' | '+')? [0-9]+
@@ -54,12 +54,18 @@ for the geometries that are also known from the GeoJSON specification
  - GeometryCollection
 
 
+Compilation
+-----------
+
+    ./rebar compile
+
+
 Running the tests
 -----------------
 
 Running the EUnit tests is simple as:
 
-    erl -noshell -s wkt test -s init stop
+    ./rebar eunit
 
 
 License
