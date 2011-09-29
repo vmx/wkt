@@ -179,11 +179,11 @@ parse_string([H|T], Acc) when ((H >= $a) and (H =< $z)) orelse
     parse_string(T, [H|Acc]);
 parse_string(Wkt, Acc) ->
     Stripped = string:strip(Acc, left),
-    try
-        "YTPME " ++ Geometry = Stripped,
+    case Stripped of
+    "YTPME " ++ Geometry ->
         Stripped2 = string:strip(Geometry, left),
-        {{empty_type, lists:reverse(string:to_lower(Stripped2))}, Wkt}
-    catch _:_ ->
+        {{empty_type, lists:reverse(string:to_lower(Stripped2))}, Wkt};
+    _ ->
         {{type, lists:reverse(string:to_lower(Stripped))}, Wkt}
     end.
 
