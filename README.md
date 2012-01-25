@@ -71,4 +71,5 @@ Running the EUnit tests is simple as:
 License
 -------
 
-The code is released under the MIT License.
+The code is released under the Apache License 2.0.
+Copyright 2010-2012, Volker Mische (http://vmx.cx/)
